@@ -313,7 +313,10 @@ L<https://github.com/thrig/Game-RaycastFOV>
 
 =head1 SEE ALSO
 
-L<List::Util>, L<NetHack::FOV>
+L<Game::Xomb> uses a modified version of this module's raycast code to
+provide FOV.
+
+L<NetHack::FOV>
 
 L<https://github.com/thrig/ministry-of-silly-vaults/>
 
