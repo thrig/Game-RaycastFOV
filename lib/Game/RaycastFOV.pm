@@ -5,7 +5,7 @@
 
 package Game::RaycastFOV;
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 use strict;
 use warnings;
@@ -118,14 +118,6 @@ our %circle_points = (
     ]
 );
 
-# shadowcast multipliers for transforming coordinates into other octants
-our @mult = (
-    [ 1, 0, 0,  -1, -1, 0,  0,  1 ],
-    [ 0, 1, -1, 0,  0,  -1, 1,  0 ],
-    [ 0, 1, 1,  0,  0,  -1, -1, 0 ],
-    [ 1, 0, 0,  1,  -1, 0,  0,  -1 ],
-);
-
 # the lack of checks are for speed, use at your own risk
 sub cached_circle (&$$$) {
     my ($callback, $x, $y, $radius) = @_;
@@ -145,19 +137,26 @@ sub raycast {
 sub shadowcast {
     my ($startx, $starty, $radius, $bcb, $lcb, $rcb) = @_;
     $lcb->($startx, $starty, 0, 0);
-    for my $octet (0 .. 7) {
-        _shadowcast($startx, $starty, $bcb, $lcb, $rcb, 1, 1.0, 0.0, $radius,
-            $mult[0][$octet], $mult[1][$octet], $mult[2][$octet], $mult[3][$octet]);
+    for my $mult (
+        [ 1,  0,  0,  1 ],
+        [ 0,  1,  1,  0 ],
+        [ 0,  -1, 1,  0 ],
+        [ -1, 0,  0,  1 ],
+        [ -1, 0,  0,  -1 ],
+        [ 0,  -1, -1, 0 ],
+        [ 0,  1,  -1, 0 ],
+        [ 1,  0,  0,  -1 ]
+    ) {
+        _shadowcast($startx, $starty, $radius, $bcb, $lcb, $rcb, 1, 1.0, 0.0, @$mult);
     }
 }
 
 sub _shadowcast {
-    my ($startx, $starty, $bcb, $lcb, $rcb, $row, $light_start, $light_end,
-        $radius, $xx, $xy, $yx, $yy)
+    my ($startx, $starty, $radius, $bcb, $lcb, $rcb, $row, $light_start,
+        $light_end, $xx, $xy, $yx, $yy)
       = @_;
-    return if $light_start < $light_end;
-    my $new_start = 0.0;
     my $blocked   = 0;
+    my $new_start = 0.0;
     for my $j ($row .. $radius) {
         my $dy = -$j;
         for my $dx ($dy .. 0) {
@@ -165,28 +164,26 @@ sub _shadowcast {
             my $lslope = ($dx - 0.5) / ($dy + 0.5);
             if    ($light_start < $rslope) { next }
             elsif ($light_end > $lslope)   { last }
-            else {
-                my $curx = $startx + $dx * $xx + $dy * $xy;
-                my $cury = $starty + $dx * $yx + $dy * $yy;
-                $lcb->($curx, $cury, $dx, $dy) if $rcb->($dx, $dy);
-                if ($blocked) {
-                    if ($bcb->($curx, $cury)) {
-                        $new_start = $rslope;
-                        next;
-                    } else {
-                        $blocked     = 0;
-                        $light_start = $new_start;
-                    }
+            my $curx = $startx + $dx * $xx + $dy * $xy;
+            my $cury = $starty + $dx * $yx + $dy * $yy;
+            $lcb->($curx, $cury, $dx, $dy) if $rcb->($dx, $dy);
+            if ($blocked) {
+                if ($bcb->($curx, $cury)) {
+                    $new_start = $rslope;
+                    next;
                 } else {
-                    if ($bcb->($curx, $cury) and $j < $radius) {
-                        $blocked = 1;
-                        _shadowcast(
-                            $startx, $starty,      $bcb,    $lcb,    $rcb,
-                            $j + 1,  $light_start, $lslope, $radius, $xx,
-                            $xy,     $yx,          $yy
-                        );
-                        $new_start = $rslope;
-                    }
+                    $blocked     = 0;
+                    $light_start = $new_start;
+                }
+            } else {
+                if ($bcb->($curx, $cury) and $j < $radius) {
+                    $blocked = 1;
+                    _shadowcast(
+                        $startx, $starty, $radius,      $bcb,    $lcb,
+                        $rcb,    $j + 1,  $light_start, $lslope, $xx,
+                        $xy,     $yx,     $yy
+                    ) unless $light_start < $lslope;
+                    $new_start = $rslope;
                 }
             }
         }
