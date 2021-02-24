@@ -5,14 +5,14 @@
 
 package Game::RaycastFOV;
 
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 
 use strict;
 use warnings;
-use Exporter 'import';
 use Math::Trig ':pi';
 require XSLoader;
 
+use base qw(Exporter);
 our @EXPORT_OK =
   qw(bypair bypairall cached_circle circle line raycast shadowcast swing_circle %circle_points);
 
@@ -168,7 +168,7 @@ sub _shadowcast {
             my $cury = $starty + $dx * $yx + $dy * $yy;
             $lcb->($curx, $cury, $dx, $dy) if $rcb->($dx, $dy);
             if ($blocked) {
-                if ($bcb->($curx, $cury)) {
+                if ($bcb->($curx, $cury, $dx, $dy)) {
                     $new_start = $rslope;
                     next;
                 } else {
@@ -176,7 +176,7 @@ sub _shadowcast {
                     $light_start = $new_start;
                 }
             } else {
-                if ($bcb->($curx, $cury) and $j < $radius) {
+                if ($bcb->($curx, $cury, $dx, $dy) and $j < $radius) {
                     $blocked = 1;
                     _shadowcast(
                         $startx, $starty, $radius,      $bcb,    $lcb,
@@ -232,9 +232,7 @@ Game::RaycastFOV - raycast field-of-view and related routines
 This module contains various subroutines for fast integer calculation of
 lines and circles (and a slow one, too) that help perform Field Of View
 (FOV) calculations to show what cells are visible from a given cell via
-raycasting out from that cell. Raycasting visits adjacent squares lots
-especially as the FOV grows so will benefit from caching and more
-closed-in than open level layouts.
+raycasting or shadowcasting out from that cell.
 
 =head2 Raycast Explained in One Thousand Words or Less
 
@@ -303,23 +301,43 @@ B<raycast> calls B<line> between I<x> and I<y> and the points returned
 by the circle function; B<line> in turn will call the user-supplied
 B<point-fn> to handle what should happen at each raycasted point.
 Additional arguments I<...> will be passed to the I<circle-fn> following
-I<x> and I<y> (the center of the circle. L</"EXAMPLES"> may be of more help?
+I<x> and I<y> (the center of the circle).
+
+L</"EXAMPLES"> may be of more help than the above text?
 
 =item B<shadowcast> I<x> I<y> I<radius> I<blockcb> I<litcb> I<radiuscb>
 
 Performs a shadow cast FOV calculation of the given I<radius> around the
-point I<x>, I<y>. The I<blockcb> is called with I<nx>, I<ny> and should
-determine whether that coordinate is blocked on the level map. The
-I<litcb> is also called with coordinates and should indicate that that
-cell is visible.
+point I<x>, I<y>. Callbacks:
 
-The I<radius> callback is given the I<deltax>, I<deltay>, and I<radius>
-and should return true if the deltas are within the radious. This allows
-for different FOV shapes.
+=over 4
 
-The callbacks may be called with points outside of the level map. The
-I<radius> callback delta values may be negative so may need to be run
-through C<abs> or C<** 2> to determine the distance.
+=item *
+
+I<blockcb> is called with I<newx>, I<newy> (the point shadowcasting has
+reached), I<deltax>, and I<deltay> (the delta from the origin for the
+point). It return a boolean indicating whether that coordinate is
+blocked on the level map (e.g. by a wall, a large monster, or maybe the
+angle from the starting point is no good, etc).
+
+The I<deltax> and I<deltay> values are only passed in module version
+2.02 or higher.
+
+=item *
+
+I<litcb> is called with I<newx>, I<newy>, I<deltax>, and I<deltay> and
+should do whatever needs to be done to present that point as visible.
+
+=item *
+
+I<radiuscb> is passed I<deltax>, I<deltay>, and I<radius> and must
+return true if the deltas are within the radius. This allows for
+different FOV shapes. The delta values could be negative so will need to
+be run through C<abs> or C<** 2> to determine the distance.
+
+=back
+
+B<The callbacks may be called with points outside of a level map>.
 
 =item B<swing_circle> I<callback> I<x0> I<y0> I<radius> I<swing>
 
