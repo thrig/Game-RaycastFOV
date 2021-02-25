@@ -12,7 +12,8 @@
 #   $ perl eg/shadowcast --fill=0 7
 #   ...
 
-use 5.24.0;
+use 5.10.0;
+use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long qw(GetOptions);
@@ -46,13 +47,13 @@ if ( defined $fov_angle ) {
     die "FOV angle must be 0..359" if $fov_angle < 0 or $fov_angle > 359;
     $fov_angle = deg2rad($fov_angle) / 2;
     $direction = deg2rad( 360 - $direction );
-    my $loangle   = $direction - $fov_angle;
-    my $hiangle   = $direction + $fov_angle;
+    my $loangle = $direction - $fov_angle;
+    my $hiangle = $direction + $fov_angle;
 
-    if ($loangle < 0) {
-        push @bounds, [ pi*2 + $loangle, pi*2 ], [ 0, $hiangle ];
-    } elsif ($hiangle > pi*2) {
-        push @bounds, [ $loangle, pi*2 ], [ 0, $hiangle - pi*2 ];
+    if ( $loangle < 0 ) {
+        push @bounds, [ pi * 2 + $loangle, pi * 2 ], [ 0, $hiangle ];
+    } elsif ( $hiangle > pi * 2 ) {
+        push @bounds, [ $loangle, pi * 2 ], [ 0, $hiangle - pi * 2 ];
     } else {
         push @bounds, [ $loangle, $hiangle ];
     }
@@ -87,7 +88,7 @@ shadowcast(
         # direction is at 45 degrees where the view gets clipped down to
         # a narrow strip, unlike at other angles
         #return 0 if abs($dx+$dy) < 2;
-        
+
         return 0 if !defined $fov_angle;
 
         # TODO better way to calculate this? raycast might be good to
@@ -116,7 +117,7 @@ shadowcast(
             return 0 if $angle >= $bound->[0] and $angle <= $bound->[1];
         }
 
-        return 1; # blocked
+        return 1;                                    # blocked
     },
     sub {                                            # light up this cell
         my ( $curx, $cury, $dx, $dy ) = @_;
